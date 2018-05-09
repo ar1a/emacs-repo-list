@@ -1,21 +1,41 @@
-[%bs.raw {|require('./App.css')|}];
+type state = {repoData: option(array(RepoData.repo))};
 
-[@bs.module] external logo : string = "./logo.svg";
+type action =
+  | Loaded(array(RepoData.repo));
 
-let component = ReasonReact.statelessComponent("App");
+let component = ReasonReact.reducerComponent("App");
 
-let make = (~message, _children) => {
+let make = _children => {
   ...component,
-  render: _self =>
+  initialState: () => {repoData: None},
+  reducer: (action, _state) =>
+    switch action {
+    | Loaded(loadedRepo) => ReasonReact.Update({repoData: Some(loadedRepo)})
+    },
+  didMount: self => {
+    let handleReposLoaded = repoData => self.send(Loaded(repoData));
+    RepoData.fetchRepos()
+    |> Js.Promise.then_(repoData => {
+         handleReposLoaded(repoData);
+         Js.Promise.resolve();
+       })
+    |> ignore;
+  },
+  render: self => {
+    let repoItem =
+      switch self.state.repoData {
+      | Some(repos) =>
+        ReasonReact.array(
+          Array.map(
+            (repo: RepoData.repo) => <RepoItem key=repo.full_name repo />,
+            repos
+          )
+        )
+      | None => ReasonReact.string("Loading")
+      };
     <div className="App">
-      <div className="App-header">
-        <img src=logo className="App-logo" alt="logo" />
-        <h2> (ReasonReact.string(message)) </h2>
-      </div>
-      <p className="App-intro">
-        (ReasonReact.string("To get started, edit"))
-        <code> (ReasonReact.string(" src/App.re ")) </code>
-        (ReasonReact.string("and save to reload."))
-      </p>
-    </div>,
+      <h1> (ReasonReact.string("Reason Projects")) </h1>
+      repoItem
+    </div>;
+  }
 };
